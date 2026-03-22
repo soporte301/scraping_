@@ -40,10 +40,12 @@ const ScheduleManager = () => {
     setScraping(true);
     setScrapeSuccess(false);
     try {
-      await api.post('/scrape-now');
+      // Pass the current state to the manual trigger so it uses newest settings
+      await api.post('/scrape-now', schedule);
       setScrapeSuccess(true);
       setTimeout(() => setScrapeSuccess(false), 5000);
     } catch (err) {
+
       console.error(err);
       alert(err.response?.data?.error || 'Failed to trigger scraper.');
     } finally {

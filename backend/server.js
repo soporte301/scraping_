@@ -91,7 +91,8 @@ app.put('/api/schedule', authenticateToken, (req, res) => {
 // API: Trigger Scraper Now
 app.post('/api/scrape-now', authenticateToken, async (req, res) => {
   console.log('Manual scraper trigger requested.');
-  const success = await runScraper();
+  // If request has a body, use those settings. Otherwise use DB defaults.
+  const success = await runScraper(req.body); 
   if (success) {
     res.json({ success: true, message: 'Scraper triggered successfully' });
   } else {
@@ -100,13 +101,21 @@ app.post('/api/scrape-now', authenticateToken, async (req, res) => {
 });
 
 
+
 // Scraper Trigger Function
-const runScraper = async () => {
-  const schedule = db.prepare('SELECT * FROM schedule LIMIT 1').get();
+const runScraper = async (overrideSettings = null) => {
+  let schedule = db.prepare('SELECT * FROM schedule LIMIT 1').get();
+  
+  // Merge with overrides if provided
+  if (overrideSettings) {
+    schedule = { ...schedule, ...overrideSettings };
+  }
+
   if (!schedule || !schedule.webhook_url) {
     console.error('Scraper trigger failed: No schedule or webhook URL configured.');
     return false;
   }
+
 
   const linksRows = db.prepare('SELECT url FROM links').all();
   const urls = linksRows.map(row => row.url);
