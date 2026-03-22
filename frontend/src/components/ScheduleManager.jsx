@@ -7,8 +7,12 @@ const ScheduleManager = () => {
     cron_expression: '0 */12 * * *', 
     webhook_url: '', 
     search_query: 'agencias de viajes',
+    state: '',
+    municipality: '',
+    max_results: 10,
     is_active: 1 
   });
+
   const [loading, setLoading] = useState(false);
   const [scraping, setScraping] = useState(false);
   const [fetching, setFetching] = useState(true);
@@ -116,10 +120,52 @@ const ScheduleManager = () => {
           <p className="text-xs text-slate-500 mt-2 italic">This query will be used to find new businesses on Google Maps.</p>
         </div>
 
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label className="block text-sm font-semibold text-slate-700 mb-2">
+              Estado (State)
+            </label>
+            <input 
+              type="text" 
+              value={schedule.state || ''}
+              onChange={(e) => setSchedule({...schedule, state: e.target.value})}
+              className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
+              placeholder="e.g., Jalisco"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-semibold text-slate-700 mb-2">
+              Municipio (City)
+            </label>
+            <input 
+              type="text" 
+              value={schedule.municipality || ''}
+              onChange={(e) => setSchedule({...schedule, municipality: e.target.value})}
+              className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
+              placeholder="e.g., Guadalajara"
+            />
+          </div>
+        </div>
+
+        <div>
+          <label className="block text-sm font-semibold text-slate-700 mb-2">
+            Cantidad de Resultados (Max Results)
+          </label>
+          <input 
+            type="number" 
+            value={schedule.max_results || 10}
+            onChange={(e) => setSchedule({...schedule, max_results: parseInt(e.target.value) || 0})}
+            className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
+            min="1"
+            max="1000"
+          />
+        </div>
+
         <div>
           <label className="block text-sm font-semibold text-slate-700 mb-2">
             n8n Webhook URL
           </label>
+
           <input 
             type="url" 
             value={schedule.webhook_url || ''}

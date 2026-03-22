@@ -32,6 +32,9 @@ db.exec(`
     cron_expression TEXT NOT NULL,
     webhook_url TEXT NOT NULL,
     search_query TEXT DEFAULT 'agencias de viajes',
+    state TEXT DEFAULT '',
+    municipality TEXT DEFAULT '',
+    max_results INTEGER DEFAULT 10,
     is_active INTEGER DEFAULT 1
   );
 `);
@@ -50,17 +53,26 @@ if (userCount.count === 0) {
 const scheduleCount = db.prepare('SELECT COUNT(*) as count FROM schedule').get();
 if (scheduleCount.count === 0) {
   // Default is every 12 hours
-  db.prepare('INSERT INTO schedule (cron_expression, webhook_url, is_active, search_query) VALUES (?, ?, ?, ?)')
-    .run('0 */12 * * *', 'YOUR_WEBHOOK_URL_HERE', 1, 'agencias de viajes');
+  db.prepare('INSERT INTO schedule (cron_expression, webhook_url, is_active, search_query, state, municipality, max_results) VALUES (?, ?, ?, ?, ?, ?, ?)')
+    .run('0 */12 * * *', 'YOUR_WEBHOOK_URL_HERE', 1, 'agencias de viajes', '', '', 10);
   console.log('Default schedule created.');
 }
 
 // Auto-migration for existing databases
-try {
-  db.prepare("ALTER TABLE schedule ADD COLUMN search_query TEXT DEFAULT 'agencias de viajes'").run();
-  console.log('Migrated: Added search_query to schedule table.');
-} catch (e) {
-  // Column already exists, ignore
-}
+const migrations = [
+  "ALTER TABLE schedule ADD COLUMN search_query TEXT DEFAULT 'agencias de viajes'",
+  "ALTER TABLE schedule ADD COLUMN state TEXT DEFAULT ''",
+  "ALTER TABLE schedule ADD COLUMN municipality TEXT DEFAULT ''",
+  "ALTER TABLE schedule ADD COLUMN max_results INTEGER DEFAULT 10"
+];
+
+migrations.forEach(query => {
+  try {
+    db.prepare(query).run();
+    console.log(`Migrated: ${query}`);
+  } catch (e) {
+    // Column might already exist
+  }
+});
 
 module.exports = db;

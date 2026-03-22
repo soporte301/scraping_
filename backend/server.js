@@ -69,7 +69,7 @@ app.get('/api/schedule', authenticateToken, (req, res) => {
 });
 
 app.put('/api/schedule', authenticateToken, (req, res) => {
-  const { cron_expression, webhook_url, search_query, is_active } = req.body;
+  const { cron_expression, webhook_url, search_query, state, municipality, max_results, is_active } = req.body;
   if (!cron_expression || !webhook_url) {
     return res.status(400).json({ error: 'Cron expression and webhook URL are required' });
   }
@@ -79,12 +79,14 @@ app.put('/api/schedule', authenticateToken, (req, res) => {
     return res.status(400).json({ error: 'Invalid cron expression' });
   }
 
-  db.prepare('UPDATE schedule SET cron_expression = ?, webhook_url = ?, search_query = ?, is_active = ? WHERE id = (SELECT id FROM schedule LIMIT 1)')
-    .run(cron_expression, webhook_url, search_query || 'agencias de viajes', is_active ? 1 : 0);
+  db.prepare('UPDATE schedule SET cron_expression = ?, webhook_url = ?, search_query = ?, state = ?, municipality = ?, max_results = ?, is_active = ? WHERE id = (SELECT id FROM schedule LIMIT 1)')
+    .run(cron_expression, webhook_url, search_query || 'agencias de viajes', state || '', municipality || '', max_results || 10, is_active ? 1 : 0);
   
   setupCronJob(); // Restart cron job
   res.json({ success: true });
 });
+
+
 
 // API: Trigger Scraper Now
 app.post('/api/scrape-now', authenticateToken, async (req, res) => {
@@ -117,9 +119,14 @@ const runScraper = async () => {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ 
         urls, 
-        query: schedule.search_query || 'agencias de viajes' 
+        query: schedule.search_query || 'agencias de viajes',
+        state: schedule.state || '',
+        municipality: schedule.municipality || '',
+        max_results: schedule.max_results || 10
       })
     });
+
+
     
     console.log(`Webhook responded with status ${response.status}`);
     return response.ok;
