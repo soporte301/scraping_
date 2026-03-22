@@ -69,7 +69,7 @@ app.get('/api/schedule', authenticateToken, (req, res) => {
 });
 
 app.put('/api/schedule', authenticateToken, (req, res) => {
-  const { cron_expression, webhook_url, is_active } = req.body;
+  const { cron_expression, webhook_url, search_query, is_active } = req.body;
   if (!cron_expression || !webhook_url) {
     return res.status(400).json({ error: 'Cron expression and webhook URL are required' });
   }
@@ -79,12 +79,55 @@ app.put('/api/schedule', authenticateToken, (req, res) => {
     return res.status(400).json({ error: 'Invalid cron expression' });
   }
 
-  db.prepare('UPDATE schedule SET cron_expression = ?, webhook_url = ?, is_active = ? WHERE id = (SELECT id FROM schedule LIMIT 1)')
-    .run(cron_expression, webhook_url, is_active ? 1 : 0);
+  db.prepare('UPDATE schedule SET cron_expression = ?, webhook_url = ?, search_query = ?, is_active = ? WHERE id = (SELECT id FROM schedule LIMIT 1)')
+    .run(cron_expression, webhook_url, search_query || 'agencias de viajes', is_active ? 1 : 0);
   
   setupCronJob(); // Restart cron job
   res.json({ success: true });
 });
+
+// API: Trigger Scraper Now
+app.post('/api/scrape-now', authenticateToken, async (req, res) => {
+  console.log('Manual scraper trigger requested.');
+  const success = await runScraper();
+  if (success) {
+    res.json({ success: true, message: 'Scraper triggered successfully' });
+  } else {
+    res.status(500).json({ error: 'Failed to trigger scraper' });
+  }
+});
+
+
+// Scraper Trigger Function
+const runScraper = async () => {
+  const schedule = db.prepare('SELECT * FROM schedule LIMIT 1').get();
+  if (!schedule || !schedule.webhook_url) {
+    console.error('Scraper trigger failed: No schedule or webhook URL configured.');
+    return false;
+  }
+
+  const linksRows = db.prepare('SELECT url FROM links').all();
+  const urls = linksRows.map(row => row.url);
+  
+  console.log(`[${new Date().toISOString()}] Triggering Scraper...`);
+  
+  try {
+    const response = await fetch(schedule.webhook_url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ 
+        urls, 
+        query: schedule.search_query || 'agencias de viajes' 
+      })
+    });
+    
+    console.log(`Webhook responded with status ${response.status}`);
+    return response.ok;
+  } catch (error) {
+    console.error('Error hitting n8n webhook:', error.message);
+    return false;
+  }
+};
 
 // Cron Job Manager
 let activeCronTask = null;
@@ -104,28 +147,11 @@ const setupCronJob = () => {
   console.log(`Setting up cron schedule: ${schedule.cron_expression}`);
   
   activeCronTask = cron.schedule(schedule.cron_expression, async () => {
-    console.log(`[${new Date().toISOString()}] Cron job triggered! Sending links to Webhook...`);
-    const linksRows = db.prepare('SELECT url FROM links').all();
-    const urls = linksRows.map(row => row.url);
-    
-    if (urls.length === 0) {
-      console.log('No URLs to scrape. Skipping webhook execution.');
-      return;
-    }
-
-    try {
-      const response = await fetch(schedule.webhook_url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ urls })
-      });
-      
-      console.log(`Webhook responded with status ${response.status}`);
-    } catch (error) {
-      console.error('Error hitting n8n webhook:', error.message);
-    }
+    console.log(`[${new Date().toISOString()}] Cron job triggered!`);
+    await runScraper();
   });
 };
+
 
 // Serve static frontend in production
 app.use(express.static(path.join(__dirname, '../frontend/dist')));

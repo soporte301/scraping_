@@ -3,10 +3,17 @@ import { Clock, Save, Info } from 'lucide-react';
 import api from '../api';
 
 const ScheduleManager = () => {
-  const [schedule, setSchedule] = useState({ cron_expression: '0 */12 * * *', webhook_url: '', is_active: 1 });
+  const [schedule, setSchedule] = useState({ 
+    cron_expression: '0 */12 * * *', 
+    webhook_url: '', 
+    search_query: 'agencias de viajes',
+    is_active: 1 
+  });
   const [loading, setLoading] = useState(false);
+  const [scraping, setScraping] = useState(false);
   const [fetching, setFetching] = useState(true);
   const [success, setSuccess] = useState(false);
+  const [scrapeSuccess, setScrapeSuccess] = useState(false);
 
   const fetchSchedule = async () => {
     setFetching(true);
@@ -23,6 +30,22 @@ const ScheduleManager = () => {
   useEffect(() => {
     fetchSchedule();
   }, []);
+
+  const handleScrapeNow = async () => {
+    if (!window.confirm('Are you sure you want to trigger the scraper manually?')) return;
+    setScraping(true);
+    setScrapeSuccess(false);
+    try {
+      await api.post('/scrape-now');
+      setScrapeSuccess(true);
+      setTimeout(() => setScrapeSuccess(false), 5000);
+    } catch (err) {
+      console.error(err);
+      alert(err.response?.data?.error || 'Failed to trigger scraper.');
+    } finally {
+      setScraping(false);
+    }
+  };
 
   const handleSave = async (e) => {
     e.preventDefault();
@@ -80,6 +103,21 @@ const ScheduleManager = () => {
 
         <div>
           <label className="block text-sm font-semibold text-slate-700 mb-2">
+            Google Maps Search Query
+          </label>
+          <input 
+            type="text" 
+            value={schedule.search_query || ''}
+            onChange={(e) => setSchedule({...schedule, search_query: e.target.value})}
+            className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
+            required
+            placeholder="e.g., agencias de viajes en Guadalajara"
+          />
+          <p className="text-xs text-slate-500 mt-2 italic">This query will be used to find new businesses on Google Maps.</p>
+        </div>
+
+        <div>
+          <label className="block text-sm font-semibold text-slate-700 mb-2">
             n8n Webhook URL
           </label>
           <input 
@@ -110,19 +148,36 @@ const ScheduleManager = () => {
           </label>
         </div>
 
-        <button 
-          type="submit" 
-          disabled={loading || fetching}
-          className={`w-full py-3 mt-4 text-white font-semibold rounded-xl shadow-lg transition-all flex items-center justify-center transform active:scale-[0.98] ${success ? 'bg-emerald-500 hover:bg-emerald-600 shadow-emerald-500/30' : 'bg-gradient-to-r from-slate-800 to-slate-900 hover:from-slate-700 hover:to-slate-800 shadow-slate-900/20'}`}
-        >
-          {loading ? (
-            <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-          ) : success ? (
-            'Saved Successfully!'
-          ) : (
-            <><Save size={18} className="mr-2" /> Save Configuration</>
-          )}
-        </button>
+        <div className="grid grid-cols-2 gap-4 mt-4">
+          <button 
+            type="submit" 
+            disabled={loading || fetching}
+            className={`py-3 text-white font-semibold rounded-xl shadow-lg transition-all flex items-center justify-center transform active:scale-[0.98] ${success ? 'bg-emerald-500 hover:bg-emerald-600 shadow-emerald-500/30' : 'bg-gradient-to-r from-slate-800 to-slate-900 hover:from-slate-700 hover:to-slate-800 shadow-slate-900/20'}`}
+          >
+            {loading ? (
+              <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+            ) : success ? (
+              'Saved Successfully!'
+            ) : (
+              <><Save size={18} className="mr-2" /> Save Config</>
+            )}
+          </button>
+
+          <button 
+            type="button"
+            onClick={handleScrapeNow}
+            disabled={scraping || fetching}
+            className={`py-3 font-semibold rounded-xl border-2 transition-all flex items-center justify-center transform active:scale-[0.98] ${scrapeSuccess ? 'bg-indigo-100 border-indigo-500 text-indigo-700' : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50 hover:border-slate-300'}`}
+          >
+            {scraping ? (
+              <div className="w-5 h-5 border-2 border-indigo-300 border-t-indigo-600 rounded-full animate-spin" />
+            ) : scrapeSuccess ? (
+              'Triggered!'
+            ) : (
+              'Run Now'
+            )}
+          </button>
+        </div>
       </form>
     </div>
   );
